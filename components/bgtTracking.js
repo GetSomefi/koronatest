@@ -1,15 +1,104 @@
 import React, { Component } from 'react';
 import { Alert, View, Text } from 'react-native';
+
+
+//asennus
+//yarn add @mauron85/react-native-background-geolocation
+//node ./node_modules/@mauron85/react-native-background-geolocation/scripts/postlink.js
+//ja jos joku paskoo ni aja tää
+//PS D:\ReactNativeProjektitPC\koronatesti> cd .\android\
+//PS D:\ReactNativeProjektitPC\koronatesti\android> .\gradlew clean
+//ja sit viel ota Permission location pois ja anna lupa apissa
 import BackgroundGeolocation from '@mauron85/react-native-background-geolocation';
+//import DeviceInfo from 'react-native-device-info';
 
 class BgTracking extends Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      location:null,
+      senderIdToBackend:"1278498374923844jbkj234hkj34hk32j4hk32hj3",
+      coronaSurrondingsHeader:"Korona appi",
+      coronaSurrondings:"Kaikki ok"
+    };
+  }
+
+  sendToBackend = async(location) => {
+    console.log("send to backend: ",location);
+    
+    let ROOT_URL = "https://koikka.work/korona/api.php";
+    console.log("Root url " + ROOT_URL);
+
+    let path = "?action=saveToDatabase&accuracy="+location.accuracy
+    +"&senderId="+this.state.senderIdToBackend
+    +"&lon="+location.longitude
+    +"&lat="+location.latitude
+    +"&timestamp="+location.timestamp;
+    //let path = "orders/"+id+"?status=completed&consumer_key="+this.state.consumer_key+"&consumer_secret="+this.state.consumer_secret;        
+
+    return fetch(ROOT_URL + path, {
+    //return fetch(ROOT_URL, {
+        method: 'POST',
+        body: null,
+    }).then(response => response.json())
+    .then(data => {
+      console.log("Onnistui ", location, data, data.notify);
+      let note = "Kaikki ok";
+      let header = "Korona appi";
+      if(data.notify){
+        note = "Ihmisiä lähellä!";
+        header = "Varoitus!";
+      }
+      this.setState({
+        coronaSurrondings:note,
+        coronaSurrondingsHeader:header
+      })
+    })
+    .catch((error) =>{
+        this.setState({
+            wait:false,
+        });
+        console.error(error);
+    });  
+    
+  }
+
+  componentDidUpdate() {
+    BackgroundGeolocation.configure({
+      desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
+      stationaryRadius: 50,
+      distanceFilter: 50,
+      notificationTitle: this.state.coronaSurrondingsHeader,
+      notificationText: this.state.coronaSurrondings,
+      debug: true,
+      startOnBoot: false,
+      stopOnTerminate: true,
+      locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
+      interval: 10000,
+      fastestInterval: 5000,
+      activitiesInterval: 10000,
+      stopOnStillActivity: false,
+      url: 'http://192.168.81.15:3000/location',
+      httpHeaders: {
+        'X-FOO': 'bar'
+      },
+      // customize post properties
+      postTemplate: {
+        lat: '@latitude',
+        lon: '@longitude',
+        foo: 'bar' // you can also add your own properties
+      }
+    });
+  }
+
   componentDidMount() {
     BackgroundGeolocation.configure({
       desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
       stationaryRadius: 50,
       distanceFilter: 50,
-      notificationTitle: 'Background tracking',
-      notificationText: 'enabled',
+      notificationTitle: this.state.coronaSurrondingsHeader,
+      notificationText: this.state.coronaSurrondings,
       debug: true,
       startOnBoot: false,
       stopOnTerminate: true,
@@ -34,10 +123,16 @@ class BgTracking extends Component {
       // handle your locations here
       // to perform long running operation on iOS
       // you need to create background task
+      //console.log("1 location",location);
       BackgroundGeolocation.startTask(taskKey => {
         // execute long running task
         // eg. ajax post location
         // IMPORTANT: task has to be ended by endTask
+        this.setState({
+          location:location
+        });
+        console.log("2 location",location);
+        this.sendToBackend(location);
         BackgroundGeolocation.endTask(taskKey);
       });
     });
@@ -72,7 +167,7 @@ class BgTracking extends Component {
     });
 
     BackgroundGeolocation.on('background', () => {
-      console.log('[INFO] App is in background');
+      console.log('[INFO] App is in background', this.state.location);
     });
 
     BackgroundGeolocation.on('foreground', () => {
@@ -116,6 +211,9 @@ class BgTracking extends Component {
     return (
       <View>
           <Text>Moi</Text>
+          <Text>
+             
+          </Text>
       </View>
     );
   }
