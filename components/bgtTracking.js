@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Alert, View, Text } from 'react-native';
+import { Alert, View, Text, StyleSheet } from 'react-native';
 
 
 //asennus
@@ -46,10 +46,13 @@ class BgTracking extends Component {
       console.log("Onnistui ", location, data, data.notify);
       let note = "Kaikki ok";
       let header = "Korona appi";
+      let situation = false;
       if(data.notify){
         note = "Ihmisiä lähellä!";
         header = "Varoitus!";
+        let situation = true;
       }
+      this.props.setSituation(situation);
       this.setState({
         coronaSurrondings:note,
         coronaSurrondingsHeader:header
@@ -64,14 +67,14 @@ class BgTracking extends Component {
     
   }
 
-  componentDidUpdate() {
+/*   componentDidUpdate() {
     BackgroundGeolocation.configure({
       desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
       stationaryRadius: 50,
       distanceFilter: 50,
       notificationTitle: this.state.coronaSurrondingsHeader,
       notificationText: this.state.coronaSurrondings,
-      debug: true,
+      debug: false,
       startOnBoot: false,
       stopOnTerminate: true,
       locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
@@ -90,16 +93,24 @@ class BgTracking extends Component {
         foo: 'bar' // you can also add your own properties
       }
     });
+  } */
+  componentDidUpdate() {
+    BackgroundGeolocation.configure({
+      notificationTitle: this.state.coronaSurrondingsHeader,
+      notificationText: this.state.coronaSurrondings,
+    });
+    
   }
 
   componentDidMount() {
+    //this.props.setSituation(true);
     BackgroundGeolocation.configure({
       desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
       stationaryRadius: 50,
       distanceFilter: 50,
       notificationTitle: this.state.coronaSurrondingsHeader,
       notificationText: this.state.coronaSurrondings,
-      debug: true,
+      debug: false,
       startOnBoot: false,
       stopOnTerminate: true,
       locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
@@ -210,13 +221,35 @@ class BgTracking extends Component {
   render() {
     return (
       <View>
-          <Text>Moi</Text>
-          <Text>
-             
-          </Text>
+          <Text style={styles.header}>Suojauksen tila</Text>
+          <View  style={styles.situation}>
+            <Text style={styles.situationText}>
+              {this.state.coronaSurrondings}
+            </Text>
+          </View>
       </View>
     );
   }
 }
+
+const styles = StyleSheet.create({
+  header: {
+    fontSize:20,
+    textAlign:"center",
+    color:"#fff"
+  },
+  situation:{
+    backgroundColor:"#FFF",
+    padding:15,
+    width:120,
+    alignSelf:"center",
+    marginTop:15
+  },
+  situationText: {
+    fontSize:18,
+    textAlign:"center",
+    color:"#000"
+  }
+});
 
 export default BgTracking;
