@@ -20,8 +20,40 @@ class BgTracking extends Component {
       location:null,
       senderIdToBackend:"1278498374923844jbkj234hkj34hk32j4hk32hj3",
       coronaSurrondingsHeader:"Korona appi",
-      coronaSurrondings:"Kaikki ok"
+      coronaSurrondings:"Kaikki ok",
+      timer:0,
+      debugStage:false,
     };
+  }
+
+  reConfigure = () => {
+
+    BackgroundGeolocation.configure({
+      desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
+      stationaryRadius: 50,
+      distanceFilter: 50,
+      notificationTitle: this.state.coronaSurrondingsHeader,
+      notificationText: this.state.coronaSurrondings,
+      debug: this.state.debugStage,
+      startOnBoot: false,
+      stopOnTerminate: true,
+      locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
+      interval: 10000,
+      fastestInterval: 5000,
+      activitiesInterval: 10000,
+      stopOnStillActivity: false,
+      url: 'http://192.168.81.15:3000/location',
+      httpHeaders: {
+        'X-FOO': 'bar'
+      },
+      // customize post properties
+      postTemplate: {
+        lat: '@latitude',
+        lon: '@longitude',
+        foo: 'bar' // you can also add your own properties
+      }
+    });  
+
   }
 
   sendToBackend = async(location) => {
@@ -47,16 +79,23 @@ class BgTracking extends Component {
       let note = "Kaikki ok";
       let header = "Korona appi";
       let situation = false;
+      let debugit = false;
       if(data.notify){
         note = "Ihmisiä lähellä!";
         header = "Varoitus!";
         let situation = true;
+        debugit = true;
       }
       this.props.setSituation(situation);
       this.setState({
         coronaSurrondings:note,
-        coronaSurrondingsHeader:header
+        coronaSurrondingsHeader:header,
+        debugStage:debugit
       })
+
+      
+      //BackgroundGeolocation.configure.notificationText = this.state.coronaSurrondings;
+
     })
     .catch((error) =>{
         this.setState({
@@ -66,69 +105,15 @@ class BgTracking extends Component {
     });  
     
   }
-
-/*   componentDidUpdate() {
-    BackgroundGeolocation.configure({
-      desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
-      stationaryRadius: 50,
-      distanceFilter: 50,
-      notificationTitle: this.state.coronaSurrondingsHeader,
-      notificationText: this.state.coronaSurrondings,
-      debug: false,
-      startOnBoot: false,
-      stopOnTerminate: true,
-      locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
-      interval: 10000,
-      fastestInterval: 5000,
-      activitiesInterval: 10000,
-      stopOnStillActivity: false,
-      url: 'http://192.168.81.15:3000/location',
-      httpHeaders: {
-        'X-FOO': 'bar'
-      },
-      // customize post properties
-      postTemplate: {
-        lat: '@latitude',
-        lon: '@longitude',
-        foo: 'bar' // you can also add your own properties
-      }
-    });
-  } */
-  componentDidUpdate() {
-    BackgroundGeolocation.configure({
-      notificationTitle: this.state.coronaSurrondingsHeader,
-      notificationText: this.state.coronaSurrondings,
-    });
-    
+  componentDidUpdate(prevProps, prevState) {
+    if(prevState.coronaSurrondings!==this.state.coronaSurrondings)
+      this.reConfigure();    
   }
 
   componentDidMount() {
+    console.log("mount: sijainti päivittyi");
     //this.props.setSituation(true);
-    BackgroundGeolocation.configure({
-      desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
-      stationaryRadius: 50,
-      distanceFilter: 50,
-      notificationTitle: this.state.coronaSurrondingsHeader,
-      notificationText: this.state.coronaSurrondings,
-      debug: false,
-      startOnBoot: false,
-      stopOnTerminate: true,
-      locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
-      interval: 10000,
-      fastestInterval: 5000,
-      activitiesInterval: 10000,
-      stopOnStillActivity: false,
-      url: 'http://192.168.81.15:3000/location',
-      httpHeaders: {
-        'X-FOO': 'bar'
-      },
-      // customize post properties
-      postTemplate: {
-        lat: '@latitude',
-        lon: '@longitude',
-        foo: 'bar' // you can also add your own properties
-      }
-    });
+    //this.reConfigure();
 
     BackgroundGeolocation.on('location', (location) => {
       // handle your locations here
@@ -142,7 +127,6 @@ class BgTracking extends Component {
         this.setState({
           location:location
         });
-        console.log("2 location",location);
         this.sendToBackend(location);
         BackgroundGeolocation.endTask(taskKey);
       });
@@ -204,9 +188,9 @@ class BgTracking extends Component {
       console.log('[INFO] BackgroundGeolocation auth status: ' + status.authorization);
 
       // you don't need to check status before start (this is just the example)
-      if (!status.isRunning) {
+      //if (!status.isRunning) {
         BackgroundGeolocation.start(); //triggers start on start event
-      }
+      //}
     });
 
     // you can also just start without checking for status
@@ -226,6 +210,13 @@ class BgTracking extends Component {
             <Text style={styles.situationText}>
               {this.state.coronaSurrondings}
             </Text>
+            <Text style={styles.situationText}>
+              # - {this.state.timer} - 
+              
+              {
+              //JSON.stringify(this.state.location)
+              }
+            </Text>
           </View>
       </View>
     );
@@ -234,7 +225,7 @@ class BgTracking extends Component {
 
 const styles = StyleSheet.create({
   header: {
-    fontSize:20,
+    fontSize:18,
     textAlign:"center",
     color:"#fff"
   },
