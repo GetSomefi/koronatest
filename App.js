@@ -15,6 +15,7 @@ import {
   Text,
   StatusBar,
   ImageBackground,
+  TouchableHighlight,
   
 } from 'react-native';
 
@@ -31,22 +32,39 @@ const images = {
   }
 }
 
+/*
+kun rupee lähettää sitä safezonee
+päälle
+action=set_safe_zone&senderId=XXX&lat=XX&lon=XX
+pois
+action=remove_safe_zone&senderId=XXX&lat=XX&lon=XX
+*/
+
 const App = (props) => {
   const [situation, setSituation] = useState(false);
   //console.log(UpTime);
   let seconds = "nada";
 
   return (
-    <View style={styles.mainView}> 
-      <ImageBackground source={images.bg1.src} style={{position:"absolute",width: '100%', height: '100%', resizeMode: "cover"}}></ImageBackground>
-      <LinearGradient colors={['rgba(255, 255, 255, 0.7)', 'rgba(255, 255, 255, 0.4)']} style={{position:"absolute",width: '100%', height: '100%'}}></LinearGradient>
+    <View style={styles.mainView}>
+      {
+        //<ImageBackground source={images.bg1.src} style={{position:"absolute",width: '100%', height: '100%', resizeMode: "cover"}}></ImageBackground>
+      }
+      <LinearGradient colors={['rgba(51, 54, 69, 1)', 'rgba(51, 54, 69, 1)']} style={{position:"absolute",width: '100%', height: '100%'}}></LinearGradient>
+      
+      <View>
+          <TouchableHighlight>
+            <Text style={styles.setHomeButton}>Aseta sijainti turvalliseksi</Text>
+          </TouchableHighlight>
+      </View>
+
       <View style={styles.container}>
-        <View></View>
-        <Text style={styles.header}>Älä tuu lähel!</Text> 
+        <Text style={styles.header}>Älä tuu lähel!</Text>
         
         <View style={{
           ...styles.mainBubble,
-          backgroundColor: situation ? "#ea2127" : "#96bb26"
+          backgroundColor: situation ? "rgb(66, 69, 86)" : "rgb(66, 69, 86)",
+          borderColor: situation ? "rgb(248, 100, 108)" : "#64f891"
           }}>
           <View>
             <BgTracking setSituation={(c)=>setSituation(c)} />
@@ -96,18 +114,28 @@ const styles = StyleSheet.create({
     borderRadius:125,
     width:250,
     height:250,
-
-    //backgroundColor:"#96bb26",
+    borderWidth:8,
 
     //to center insides
     flexDirection:"column",
     justifyContent:"center"
   },
   header: {
-    fontSize:30,
+    fontSize:36,
     textAlign:"center",
     marginBottom:30,
-    color:"#000"
+    color:"#FFF",
+    fontFamily: 'MPLUSRounded1c-Bold'
+  },
+  setHomeButton:{
+    color:"#646772",
+    padding:15,
+    position:"absolute",
+    right:0,
+    top:0,
+    borderRadius:4,
+    textTransform:"uppercase",
+    fontFamily: 'Roboto-Regular'
   }
 });
 

@@ -1,6 +1,8 @@
 import React, { Component } from 'react';
-import { Alert, View, Text, StyleSheet } from 'react-native';
+import { Alert, View, Text, StyleSheet, Image } from 'react-native';
 
+//https://react-native-elements.github.io/react-native-elements/docs/getting_started.html
+import { Icon } from 'react-native-elements'
 
 //asennus
 //yarn add @mauron85/react-native-background-geolocation
@@ -11,6 +13,17 @@ import { Alert, View, Text, StyleSheet } from 'react-native';
 //ja sit viel ota Permission location pois ja anna lupa apissa
 import BackgroundGeolocation from '@mauron85/react-native-background-geolocation';
 //import DeviceInfo from 'react-native-device-info';
+
+import AsyncStorage from '@react-native-community/async-storage';
+
+const images = { 
+  checkIcon:{
+    src: require("../assets/checkIcon.png")
+  },
+  bg2:{
+    src: require("../assets/flower.jpg")
+  }
+}
 
 class BgTracking extends Component {
   constructor(props) {
@@ -23,11 +36,57 @@ class BgTracking extends Component {
       coronaSurrondings:"Kaikki ok",
       timer:0,
       debugStage:false,
+      asyncStorageKey:"22052020_1748",
+      interval:10000,
+      fastestInterval:5000,
+      activitiesInterval:10000,
     };
   }
 
-  reConfigure = () => {
+	storeData = async (data) => {
+		console.log('yrittää'); 
+		try {
+			console.log('data',data); 
+      await AsyncStorage.setItem(this.state.asyncStorageKey, JSON.stringify(data));
+      
+      this.getData();
+		} catch (error) {
+			console.log('Save error',error); 
+		}
+  };
+  
+  getData = async() => {
+		try {
+			//const value = AsyncStorage.getItem(key);
+			const value = await AsyncStorage.getItem(this.state.asyncStorageKey);
+      const data = JSON.parse(value);
 
+      console.log("stored: ", data);
+
+      if(!data){
+        let randNum = Math.floor((Math.random() * 10000000000) + 100000000);
+        let date = JSON.stringify( new Date() );
+        let madeUpId = randNum + "_" + date;
+        madeUpId = madeUpId.replace(/["']/g, "");
+        let newStorageData = {
+          senderIdToBackendStored:madeUpId
+        }
+        console.log(newStorageData);
+        this.storeData(newStorageData);
+      }else{
+        this.state.senderIdToBackend = data.senderIdToBackendStored;
+      }
+
+      console.log("state getin jälkeen ", this.state);
+
+    } catch (error) {
+			console.log('Fetch error',error); 
+		}
+  };
+
+  reConfigure = () => {
+    console.log("---------Reconfigure---------");
+    console.log(this.state);
     BackgroundGeolocation.configure({
       desiredAccuracy: BackgroundGeolocation.HIGH_ACCURACY,
       stationaryRadius: 50,
@@ -38,9 +97,9 @@ class BgTracking extends Component {
       startOnBoot: false,
       stopOnTerminate: true,
       locationProvider: BackgroundGeolocation.ACTIVITY_PROVIDER,
-      interval: 10000,
-      fastestInterval: 5000,
-      activitiesInterval: 10000,
+      interval: this.state.interval,
+      fastestInterval: this.state.fastestInterval, 
+      activitiesInterval: this.state.activitiesInterval, //säilytetään tämä aina näin
       stopOnStillActivity: false,
       url: 'http://192.168.81.15:3000/location',
       httpHeaders: {
@@ -53,21 +112,24 @@ class BgTracking extends Component {
         foo: 'bar' // you can also add your own properties
       }
     });  
-
+    
   }
 
   sendToBackend = async(location) => {
-    console.log("send to backend: ",location);
+    //console.log("send to backend: ",location);
     
     let ROOT_URL = "https://koikka.work/korona/api.php";
-    console.log("Root url " + ROOT_URL);
+    //console.log("Root url " + ROOT_URL);
 
     let path = "?action=saveToDatabase&accuracy="+location.accuracy
     +"&senderId="+this.state.senderIdToBackend
     +"&lon="+location.longitude
     +"&lat="+location.latitude
+    +"&altitude="+location.altitude
     +"&timestamp="+location.timestamp;
     //let path = "orders/"+id+"?status=completed&consumer_key="+this.state.consumer_key+"&consumer_secret="+this.state.consumer_secret;        
+
+    console.log("path"+path);
 
     return fetch(ROOT_URL + path, {
     //return fetch(ROOT_URL, {
@@ -75,7 +137,8 @@ class BgTracking extends Component {
         body: null,
     }).then(response => response.json())
     .then(data => {
-      console.log("Onnistui ", location, data, data.notify);
+      //console.log("Onnistui ", location, data, data.notify);
+      console.log("Onnistui ", data);
       let note = "Kaikki ok";
       let header = "Korona appi";
       let situation = false;
@@ -83,14 +146,18 @@ class BgTracking extends Component {
       if(data.notify){
         note = "Ihmisiä lähellä!";
         header = "Varoitus!";
-        let situation = true;
+        situation = true;
         debugit = true;
       }
       this.props.setSituation(situation);
       this.setState({
+        interval:data.interval,
+        fastestInterval:data.fastest_interval,
+        activitiesInterval:data.activities_interval,
         coronaSurrondings:note,
         coronaSurrondingsHeader:header,
-        debugStage:debugit
+        debugStage:debugit,
+        timer:this.state.timer+1,
       })
 
       
@@ -106,14 +173,24 @@ class BgTracking extends Component {
     
   }
   componentDidUpdate(prevProps, prevState) {
-    if(prevState.coronaSurrondings!==this.state.coronaSurrondings)
+    if(
+      prevState.coronaSurrondings!==this.state.coronaSurrondings ||
+      prevState.interval!==this.state.interval
+    )
       this.reConfigure();    
   }
 
   componentDidMount() {
+    console.log("state aluksi ", this.state);
+    this.getData();
     console.log("mount: sijainti päivittyi");
     //this.props.setSituation(true);
-    //this.reConfigure();
+    this.reConfigure();
+
+    
+    this.setState({
+      coronaSurrondingsHeader:"Älä tuu lähel!",
+    });
 
     BackgroundGeolocation.on('location', (location) => {
       // handle your locations here
@@ -205,17 +282,21 @@ class BgTracking extends Component {
   render() {
     return (
       <View>
+          <View style={styles.debug}>
+            <Text>timer {this.state.timer}</Text>
+            <Text>interval {this.state.interval}</Text>
+            <Text>fastestInterval {this.state.fastestInterval}</Text>
+            <Text>activitiesInterval {this.state.activitiesInterval}</Text>
+          </View>
+
           <Text style={styles.header}>Suojauksen tila</Text>
           <View  style={styles.situation}>
-            <Text style={styles.situationText}>
+              <Icon
+                name='check'
+                color='#64f891'
+              />
+              <Text style={styles.situationText}>
               {this.state.coronaSurrondings}
-            </Text>
-            <Text style={styles.situationText}>
-              # - {this.state.timer} - 
-              
-              {
-              //JSON.stringify(this.state.location)
-              }
             </Text>
           </View>
       </View>
@@ -224,10 +305,20 @@ class BgTracking extends Component {
 }
 
 const styles = StyleSheet.create({
+  /*Debug*/
+  debug:{
+    backgroundColor:"#FFF",
+    padding:5,
+    position:"absolute",
+    bottom:-100
+  },
+  /*Debug*/
+
   header: {
     fontSize:18,
     textAlign:"center",
-    color:"#fff"
+    color:"#fff",
+    fontFamily: 'MPLUSRounded1c-Bold'
   },
   situation:{
     backgroundColor:"#FFF",
@@ -239,7 +330,8 @@ const styles = StyleSheet.create({
   situationText: {
     fontSize:18,
     textAlign:"center",
-    color:"#000"
+    color:"#000",
+    fontFamily: 'MPLUSRounded1c-Regular'
   }
 });
 
