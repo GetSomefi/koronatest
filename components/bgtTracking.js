@@ -63,7 +63,7 @@ class BgTracking extends Component {
 		}
   };
   
-  getData = async() => {
+  getData = async(reset) => {
 		try {
 			//const value = AsyncStorage.getItem(key);
 			const value = await AsyncStorage.getItem(this.state.asyncStorageKey);
@@ -77,15 +77,49 @@ class BgTracking extends Component {
         let madeUpId = randNum + "_" + date;
         madeUpId = madeUpId.replace(/["']/g, "");
         let newStorageData = {
-          senderIdToBackendStored:madeUpId
+          senderIdToBackendStored:madeUpId,
         }
-        console.log(newStorageData);
+        console.log("new storage data", newStorageData);
         this.storeData(newStorageData);
       }else{
-        this.state.senderIdToBackend = data.senderIdToBackendStored;
+        this.setState({
+          senderIdToBackend: data.senderIdToBackendStored,
+        });
+
+        if(!data.safeZoneLocation){
+
+          console.log("safe data ei oo");
+          if(this.state.safeZoneSet){
+            let newStorageData = {
+              senderIdToBackendStored:data.senderIdToBackendStored,
+              safeZoneLocation:this.state.safeZoneLocation
+            }
+            console.log("new storage data", newStorageData);
+            this.storeData(newStorageData);
+          }
+        }else{
+          console.log("safe data on");
+          if(!reset){ //should be used for first load only
+            this.setState({
+              safeZoneSet:true,
+              senderIdToBackend: data.senderIdToBackendStored,
+              safeZoneLocation: data.safeZoneLocation
+            });     
+          }else{
+            this.state.isAtSafeZone = false;
+            let newStorageData = {
+              senderIdToBackendStored:data.senderIdToBackendStored,
+            }
+            console.log("new storage data (removed safe)", newStorageData);
+            this.storeData(newStorageData);         
+          }
+        }
       }
 
-      console.log("state getin jälkeen ", this.state);
+
+
+
+      //console.log("state getin jälkeen ", this.state);
 
     } catch (error) {
 			console.log('Fetch error',error); 
@@ -124,8 +158,7 @@ class BgTracking extends Component {
   }
 
   sendToBackend = async(location) => {
-    //console.log("send to backend: ",location);
-    
+
     let ROOT_URL = "https://koikka.work/korona/api.php";
     //console.log("Root url " + ROOT_URL);
 
@@ -151,14 +184,17 @@ class BgTracking extends Component {
       let header = "Korona appi";
       let situation = false;
       let debugit = false;
-      if(data.notify){
-        note = "Ihmisiä lähellä!";
-        header = "Varoitus!";
-        situation = true;
-        debugit = true;
+      if(!data.notify){ //change this to test danger (!) and safe (iffit erikseen jotta helpompi testaa)
+        if(!this.state.isAtSafeZone){
+          note = "Ihmisiä lähellä!";
+          header = "Varoitus!";
+          situation = true;
+          debugit = true;
+        }
       }
       this.props.setSituation(situation);
       this.setState({
+        loadingSafeZone:false,
         danger:situation,
         interval:data.interval,
         fastestInterval:data.fastest_interval,
@@ -189,7 +225,7 @@ class BgTracking extends Component {
       this.reConfigure();    
   }
 
-  ifInside = (location,center,radius) => {
+  ifInsideSafezone = (location,center,radius) => {
     console.log("if inside safezone ", location);
     
     //credit https://stackoverflow.com/questions/59633860/check-if-point-is-inside-circle
@@ -248,16 +284,14 @@ class BgTracking extends Component {
 
   setSafeZone = () => {
     this.setState({
+      loadingSafeZone:true,
       safeZoneSet:!this.state.safeZoneSet,
-      safeZoneLocation: !this.state.safeZoneSet ? {
+      safeZoneLocation:{
         lat:this.state.location.latitude,
         lon:this.state.location.longitude
-      }:{
-        lat:null,
-        lon:null
       }
     });
-    console.log('dafezone');
+    this.getData(true); //this (true) will not update state
   }
 
   componentDidMount() {
@@ -284,7 +318,24 @@ class BgTracking extends Component {
         this.setState({
           location:location
         });
-        this.ifInside(location,this.state.safeZoneLocation,this.state.safeZoneRadius);
+
+        if(this.state.safeZoneSet){
+          console.log("safe on asetetttu" , this.state.isAtSafeZone);
+          /*
+          this.setState({
+            safeZoneLocation:{
+              lat:this.state.location.latitude,
+              lon:this.state.location.longitude
+            }
+          });
+          */
+          console.log("------------->", this.state.safeZoneLocation);
+          this.ifInsideSafezone(location,this.state.safeZoneLocation,this.state.safeZoneRadius); 
+        }else{
+          console.log("safe ei asetetttu");
+        }
+        //console.log("send to backend: ",location);
+                
         this.sendToBackend(location);
         BackgroundGeolocation.endTask(taskKey);
       });
@@ -370,7 +421,7 @@ class BgTracking extends Component {
               <Text>interval {this.state.interval}</Text>
               <Text>fastestInterval {this.state.fastestInterval}</Text>
               <Text>activitiesInterval {this.state.activitiesInterval}</Text>
-              <Text>{this.state.safeZoneSet ? 'on' : 'ei'}</Text>
+              <Text>Safezone set {this.state.safeZoneSet ? 'yes' : 'no'}</Text>
               <Text>Current:{this.state.location.latitude + " " + this.state.location.longitude}</Text>
               <Text>Safe:{ this.state.safeZoneLocation.lat + " " + this.state.safeZoneLocation.lon }
               </Text>
@@ -387,22 +438,60 @@ class BgTracking extends Component {
           }
 
 
-          <Text style={styles.header}>Suojauksen tila</Text>
-          <View  style={styles.situation}>
+          {
+            this.state.isAtSafeZone ?
+            <View>
+              <Text style={styles.header}>Turvassa</Text>
+              <View  style={styles.situation}>
+                    <Icon
+                    name='favorite'
+                    color='rgb(248, 100, 108)'
+                    size={90}
+                    />
+              </View>
+            </View>:
+            <View>
+              <Text style={styles.header}>
               {
-                !this.state.danger ?
-                <Icon
-                name='check'
-                color='#64f891'
-                size={90}
-                />:
-                <Icon
-                name='block'
-                color='rgb(248, 100, 108)'
-                size={90}
-                />
+                    !this.state.danger ? "Suojauksen tila" : "Vaara!"
               }
-          </View>
+              </Text>
+              <View  style={styles.situation}>
+                  {
+                    this.state.danger ?
+                    <View>
+                      {
+                        this.state.loadingSafeZone ?
+                        <View style={styles.loadingSafeZoneContainer}>
+                          <Text style={styles.loadingSafeZoneText}>Tarkistetaan</Text>
+                          <Text style={styles.loadingSafeZoneText}>turva-aluetta</Text>
+                        </View>:null
+                      }
+                      <Icon
+                        name='block'
+                        color='rgb(248, 100, 108)'
+                        size={90}
+                      />
+                    </View>:
+                    <View>
+                      {
+                        this.state.loadingSafeZone ?
+                        <View style={styles.loadingSafeZoneContainer}>
+                          <Text style={styles.loadingSafeZoneText}>Tarkistetaan</Text>
+                          <Text style={styles.loadingSafeZoneText}>turva-aluetta</Text>
+                        </View>:null
+                      }
+                      <Icon
+                      name='check'
+                      color='#64f891'
+                      size={90}
+                      />
+                    </View>
+                  }
+              </View>
+            </View>
+          }
+
 
           <TouchableHighlight onPress={()=> this.setState({
             debug:!this.state.debug
@@ -441,12 +530,29 @@ const styles = StyleSheet.create({
   },
   /*Debug*/
 
+  /*Safezone */
   safeZoneTrigger:{
     position:"absolute",
     top:-70,
     right:-35,
   },
-
+  loadingSafeZoneContainer:{
+    position:"absolute",
+    alignSelf:"center",
+    alignItems:"center",
+    justifyContent:"center",
+    zIndex:10,
+    backgroundColor:"rgb(66, 69, 86)",
+    width:90,
+    height:90
+    //bottom:-115
+  },
+  loadingSafeZoneText:{
+    color:"#FFF",
+    textAlign:"center",
+    fontSize:12
+  },
+  /*Safezone */
 
   header: {
     fontSize:18,
