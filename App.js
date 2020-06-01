@@ -54,7 +54,7 @@ const App = (props) => {
       
       <View>
           <TouchableHighlight>
-            <Text style={styles.setHomeButton}>Aseta sijainti turvalliseksi</Text>
+            <Text style={styles.setHomeButton}>Ohje</Text>
           </TouchableHighlight>
       </View>
 

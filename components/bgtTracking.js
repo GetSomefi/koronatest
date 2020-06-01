@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Alert, View, Text, StyleSheet, Image } from 'react-native';
+import { Alert, View, Text, StyleSheet, Image, TouchableHighlight } from 'react-native';
 
 //https://react-native-elements.github.io/react-native-elements/docs/getting_started.html
 import { Icon } from 'react-native-elements'
@@ -30,6 +30,7 @@ class BgTracking extends Component {
     super(props);
 
     this.state = {
+      debug:false,
       location:null,
       senderIdToBackend:"1278498374923844jbkj234hkj34hk32j4hk32hj3",
       coronaSurrondingsHeader:"Korona appi",
@@ -40,6 +41,13 @@ class BgTracking extends Component {
       interval:10000,
       fastestInterval:5000,
       activitiesInterval:10000,
+      safeZoneLocation:{
+        lat:null,
+        lon:null
+      },
+      //safeZoneLocation:{lat: 61.4707902, lon: 21.8083698}, //makkosen huudit 61.4707902,21.8083698,20
+      safeZoneRadius: 0.05, //in kilometers (default is 50m)
+      isAtSafeZone:false
     };
   }
 
@@ -151,6 +159,7 @@ class BgTracking extends Component {
       }
       this.props.setSituation(situation);
       this.setState({
+        danger:situation,
         interval:data.interval,
         fastestInterval:data.fastest_interval,
         activitiesInterval:data.activities_interval,
@@ -180,6 +189,77 @@ class BgTracking extends Component {
       this.reConfigure();    
   }
 
+  ifInside = (location,center,radius) => {
+    console.log("if inside safezone ", location);
+    
+    //credit https://stackoverflow.com/questions/59633860/check-if-point-is-inside-circle
+    function degreesToRadians(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+    function distanceInKmBetweenEarthCoordinates(lat1, lon1, lat2, lon2) {
+        console.log(lat1, lon1, lat2, lon2);
+        var earthRadiusKm = 6371;
+
+        var dLat = degreesToRadians(lat2-lat1);
+        var dLon = degreesToRadians(lon2-lon1);
+
+        lat1 = degreesToRadians(lat1);
+        lat2 = degreesToRadians(lat2);
+
+        var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2); 
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+        return earthRadiusKm * c;
+    }
+
+    console.log(location, center, radius)
+    let newRadius = distanceInKmBetweenEarthCoordinates(location.latitude, location.longitude, center.lat, center.lon);
+    console.log(newRadius)
+
+    let difference = radius - newRadius;
+
+    difference = difference * 1000;
+    difference = difference.toFixed(2);
+
+    if( newRadius < radius ) {
+        //point is inside the circle
+        console.log('inside');
+        this.setState({
+          isAtSafeZone:true,
+          isAtSafeZoneDifference:difference
+        })
+    }
+    else if(newRadius > radius) {
+        //point is outside the circle
+        console.log('outside')
+        this.setState({
+          isAtSafeZone:false,
+          isAtSafeZoneDifference:difference
+        })
+    }
+    else {
+        //point is on the circle
+        console.log('on the circle')
+       
+    }
+
+  }
+
+  setSafeZone = () => {
+    this.setState({
+      safeZoneSet:!this.state.safeZoneSet,
+      safeZoneLocation: !this.state.safeZoneSet ? {
+        lat:this.state.location.latitude,
+        lon:this.state.location.longitude
+      }:{
+        lat:null,
+        lon:null
+      }
+    });
+    console.log('dafezone');
+  }
+
   componentDidMount() {
     console.log("state aluksi ", this.state);
     this.getData();
@@ -204,6 +284,7 @@ class BgTracking extends Component {
         this.setState({
           location:location
         });
+        this.ifInside(location,this.state.safeZoneLocation,this.state.safeZoneRadius);
         this.sendToBackend(location);
         BackgroundGeolocation.endTask(taskKey);
       });
@@ -282,23 +363,63 @@ class BgTracking extends Component {
   render() {
     return (
       <View>
-          <View style={styles.debug}>
-            <Text>timer {this.state.timer}</Text>
-            <Text>interval {this.state.interval}</Text>
-            <Text>fastestInterval {this.state.fastestInterval}</Text>
-            <Text>activitiesInterval {this.state.activitiesInterval}</Text>
-          </View>
+          {
+            this.state.debug ? 
+            <View style={styles.debug}>
+              <Text>timer {this.state.timer}</Text>
+              <Text>interval {this.state.interval}</Text>
+              <Text>fastestInterval {this.state.fastestInterval}</Text>
+              <Text>activitiesInterval {this.state.activitiesInterval}</Text>
+              <Text>{this.state.safeZoneSet ? 'on' : 'ei'}</Text>
+              <Text>Current:{this.state.location.latitude + " " + this.state.location.longitude}</Text>
+              <Text>Safe:{ this.state.safeZoneLocation.lat + " " + this.state.safeZoneLocation.lon }
+              </Text>
+              <Text>
+              {
+                this.state.isAtSafeZone ? "inside safezone " : "outside safezone " 
+              }
+              </Text>
+              <Text>
+              Ero {this.state.isAtSafeZoneDifference}m
+              </Text>
+            </View> :
+            null
+          }
+
 
           <Text style={styles.header}>Suojauksen tila</Text>
           <View  style={styles.situation}>
-              <Icon
+              {
+                !this.state.danger ?
+                <Icon
                 name='check'
                 color='#64f891'
-              />
-              <Text style={styles.situationText}>
-              {this.state.coronaSurrondings}
-            </Text>
+                size={90}
+                />:
+                <Icon
+                name='block'
+                color='rgb(248, 100, 108)'
+                size={90}
+                />
+              }
           </View>
+
+          <TouchableHighlight onPress={()=> this.setState({
+            debug:!this.state.debug
+          }) } style={styles.debugTrigger}>
+            <Icon
+                  name='info'
+                  color='#FFF'
+                  size={30}
+                />
+          </TouchableHighlight>
+          <TouchableHighlight onPress={(e)=> this.setSafeZone(e) } style={styles.safeZoneTrigger}>
+            <Icon
+                  name='favorite'
+                  color= {this.state.safeZoneSet ? 'rgb(248, 100, 108)' : '#FFF'}
+                  size={30}
+                />
+          </TouchableHighlight>
       </View>
     );
   }
@@ -307,12 +428,25 @@ class BgTracking extends Component {
 const styles = StyleSheet.create({
   /*Debug*/
   debug:{
-    backgroundColor:"#FFF",
+    backgroundColor:"#f7f7f775",
     padding:5,
     position:"absolute",
-    bottom:-100
+    bottom:-150,
+    left:-35,
+  },
+  debugTrigger:{
+    position:"absolute",
+    top:-70,
+    left:-35,
   },
   /*Debug*/
+
+  safeZoneTrigger:{
+    position:"absolute",
+    top:-70,
+    right:-35,
+  },
+
 
   header: {
     fontSize:18,
@@ -321,11 +455,10 @@ const styles = StyleSheet.create({
     fontFamily: 'MPLUSRounded1c-Bold'
   },
   situation:{
-    backgroundColor:"#FFF",
-    padding:15,
+    padding:0,
     width:120,
     alignSelf:"center",
-    marginTop:15
+    marginTop:5
   },
   situationText: {
     fontSize:18,
