@@ -184,7 +184,7 @@ class BgTracking extends Component {
       let header = "Korona appi";
       let situation = false;
       let debugit = false;
-      if(!data.notify){ //change this to test danger (!) and safe (iffit erikseen jotta helpompi testaa)
+      if(data.notify){ //change this to test danger (!) and safe (iffit erikseen jotta helpompi testaa)
         if(!this.state.isAtSafeZone){
           note = "Ihmisiä lähellä!";
           header = "Varoitus!";
